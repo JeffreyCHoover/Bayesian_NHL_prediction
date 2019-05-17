@@ -3,10 +3,14 @@ library(rvest)
 library(zoo)
 library(glue)
 
+full_game <- data.frame()
+continue <- TRUE
+jj <- 1
+
+while(continue)
+{
 #load game play-by-play data
 game_data <- read_html("http://www.espn.com/nhl/playbyplay/_/gameId/401126320")
-
-full_game <- data.frame()
 
 tables <- html_nodes(game_data, css = "table")
 tables <- html_table(tables, fill = TRUE)
@@ -84,7 +88,7 @@ game %>%
   gather(team, winprob, home_winprob:away_winprob) %>%
   ggplot(aes(x = min_played, y = winprob, color = team)) +
   geom_line(size = 1) +
-  scale_color_manual(values = c("blue", "yellow"),
+  scale_color_manual(values = c("#006D75", "#002F87"),
                      labels = c(awayTeam, homeTeam)) +
   geom_hline(aes(yintercept = 0.5), color = "#000000", linetype = "dashed",
              size = 1) +
@@ -98,3 +102,11 @@ game %>%
   theme(legend.position = "bottom", legend.title = element_blank(), 
         panel.background = element_rect(fill = 'gray', colour = 'gray'),
         plot.title = element_text(hjust = 0.5))
+
+if(full_game$min_remain[nrow(full_game)] == 0 & 
+   full_game$away_score != full_game$home_score) {
+  continue <- FALSE
+} else {
+  Sys.sleep(300)
+}
+}

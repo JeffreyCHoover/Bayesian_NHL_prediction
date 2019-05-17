@@ -1,8 +1,6 @@
 library(rvest)
 library(tidyverse)
 
-source()
-
 gamesList <- read_html("https://www.foxsports.com/nhl/odds")
 
 tables <- html_nodes(gamesList, css = "table")

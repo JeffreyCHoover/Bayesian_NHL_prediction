@@ -7,6 +7,7 @@ library(here)
 full_game <- data.frame()
 continue <- TRUE
 teamColors <- readRDS(here("teamColors.RDS"))
+teamColors <- readRDS(here("teamColors.RDS"))
 
 while(continue)
 {

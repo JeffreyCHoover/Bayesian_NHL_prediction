@@ -5,12 +5,12 @@ library(glue)
 
 full_game <- data.frame()
 continue <- TRUE
-jj <- 1
+teamColors <- readRDS("teamColors.RDS")
 
 while(continue)
 {
 #load game play-by-play data
-game_data <- read_html("http://www.espn.com/nhl/playbyplay/_/gameId/401126320")
+game_data <- read_html("http://www.espn.com/nhl/playbyplay/_/gameId/401131477")
 
 tables <- html_nodes(game_data, css = "table")
 tables <- html_table(tables, fill = TRUE)
@@ -21,6 +21,13 @@ game_info <- game_info[1:4]
 
 awayTeam <- colnames(game_info)[3]
 homeTeam <- colnames(game_info)[4]
+homeColor <- teamColors %>%
+  filter(team == homeTeam) %>%
+  pull(primary_color)
+awayColor <- teamColors %>%
+  filter(team == awayTeam) %>%
+  pull(case_when(primary_color == homeColor ~ secondary_color,
+                  TRUE ~ primary_color))
 
 # variable to track period number
 p <- case_when(grepl(pattern = "1st period", 
@@ -35,12 +42,14 @@ p <- case_when(grepl(pattern = "1st period",
 
 tibble(
   x = seq(-10, 10, 0.1),  # x axis in increments of .5
-  y = dnorm(seq(-10, 10, 0.1), mean = -1.34, sd = 2)# probability of winning
+  y = dnorm(seq(-10, 10, 0.1), mean = -1.5, sd = 2)# probability of winning
 ) %>%
   mutate(winner = ifelse(x <= 0, homeTeam, awayTeam)) %>% 
   ggplot() +
   geom_ribbon(aes(x = x, ymin = 0, ymax = y, fill = winner)) +
-  labs(x = "Away team's margin of victory", y = "Probability")
+  labs(x = "Away team's margin of victory", y = "Probability", 
+       fill = "Teams", title = "Pre-game Win Probabilities") +
+  scale_fill_manual(values = c(awayColor, homeColor))
 
 source("NHL.functions.R")
 periods <- period(p, tables)
@@ -72,7 +81,7 @@ for (i in seq_len(nrow(full_game))) {
 game <- game %>%
   mutate(
     away_margin = away - home,
-    mean = (-1.34 * (min_remain / 60)) + (away_margin * (min_played / 60)),
+    mean = (-1.5 * (min_remain / 60)) + (away_margin * (min_played / 60)),
     sd = 2 / sqrt(60 / min_remain),
     home_winprob = pnorm(0, mean = mean, sd = sd, lower.tail = TRUE),
     away_winprob = 1 - home_winprob
@@ -82,14 +91,20 @@ game <- game %>%
 game %>%
   gather(team, winprob, home_winprob:away_winprob) %>%
   ggplot(aes(x = min_played, y = winprob, color = team)) +
-  geom_line()
+  geom_line() + 
+  scale_color_manual(values = c(awayColor, homeColor),
+                     labels = c(awayTeam, homeTeam))
 
+dev.off()
+dev.new(3, 3)
+plot(
 game %>%
   gather(team, winprob, home_winprob:away_winprob) %>%
-  ggplot(aes(x = min_played, y = winprob, color = team)) +
-  geom_line(size = 1) +
-  scale_color_manual(values = c("#006D75", "#002F87"),
-                     labels = c(awayTeam, homeTeam)) +
+  ggplot(aes(x = min_played, y = winprob, ymin = 0, ymax = 100, fill = team)) +
+  geom_area(position = "fill", size = 1) +
+  scale_fill_manual(values = c(awayColor, homeColor),
+                     labels = c(paste0(awayTeam, " Win Prob", sep = ""),
+                                paste0(homeTeam, " Win Prob", sep = ""))) +
   geom_hline(aes(yintercept = 0.5), color = "#000000", linetype = "dashed",
              size = 1) +
   scale_y_continuous(limits = c(0, 1), breaks = seq(0, 1, by = 0.1),
@@ -97,16 +112,18 @@ game %>%
   scale_x_continuous(limits = c(0, 60), breaks = seq(0, 60, 4),
                      labels = paste0(seq(60, 0, -4))) +
   labs(y = "Win Probability", x = "Minutes Remaining", 
-       title = paste0(awayTeam, " vs ", homeTeam, " Win Probability", sep = "")) +
-  theme_minimal() +
+       title = paste0(awayTeam, " vs ", homeTeam, " Win Probability", 
+                      sep = "")) +
+  #theme_minimal() +
   theme(legend.position = "bottom", legend.title = element_blank(), 
         panel.background = element_rect(fill = 'gray', colour = 'gray'),
         plot.title = element_text(hjust = 0.5))
+)
 
 if(full_game$min_remain[nrow(full_game)] == 0 & 
    full_game$away_score != full_game$home_score) {
   continue <- FALSE
 } else {
-  Sys.sleep(300)
+  Sys.sleep(120)
 }
 }
